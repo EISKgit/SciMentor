@@ -49,7 +49,7 @@ Rules:
 
     llm = ChatGroq(model="llama3-70b-8192", temperature=0.4)
 
-    # 1️⃣ Get code from LLM
+    # 1️⃣ Get initial code
     messages = [SystemMessage(content=SYSTEM_PROMPT), HumanMessage(content=subproblem)]
     stream = llm.stream(messages)
     response = "".join(chunk.content for chunk in stream if hasattr(chunk, "content"))
@@ -59,20 +59,28 @@ Rules:
     else:
         code = response.strip()
 
+    # Save generated code
     if topic:
         save_to_file(topic, code, "experiment_code.py")
 
+    # Ensure plot folder exists
     project_folder = create_project_folder(topic) if topic else None
     plot_folder = os.path.join(project_folder, "plots") if project_folder else "plots"
     os.makedirs(plot_folder, exist_ok=True)
 
-    # Ensure plot saving
+    # 2️⃣ Ensure there is a plt.savefig()
     if "matplotlib" in code and "plt.savefig" not in code:
         timestamp = datetime.now().strftime("%H-%M-%S")
         img_path = os.path.join(plot_folder, f"plot_{timestamp}.png")
         code += f"\nimport matplotlib.pyplot as plt\nplt.savefig(r'{img_path}')"
 
-    # 2️⃣ Retry until code runs & plot is saved
+    # 3️⃣ Force any existing plt.savefig calls into plot folder
+    if "plt.savefig" in code:
+        timestamp = datetime.now().strftime("%H-%M-%S")
+        forced_path = os.path.join(plot_folder, f"plot_{timestamp}.png")
+        code = code.replace("plt.savefig(", f"plt.savefig(r'{forced_path}') # ")
+
+    # 4️⃣ Retry until success or fallback
     attempt = 1
     while attempt <= max_retries:
         buf = io.StringIO()
@@ -82,7 +90,7 @@ Rules:
 
             output_text = buf.getvalue()
 
-            # Check if plot exists
+            # Ensure at least one plot exists
             if not any(fname.endswith(".png") for fname in os.listdir(plot_folder)):
                 raise RuntimeError("No plot file generated — retrying.")
 
@@ -122,7 +130,7 @@ Return only corrected Python code.
                 else:
                     code = fixed_response.strip()
             else:
-                # 3️⃣ Fallback plot if all retries fail
+                # 5️⃣ Fallback plot if retries fail
                 import matplotlib.pyplot as plt
                 plt.figure()
                 plt.plot([1, 2, 3], [4, 5, 6])
@@ -134,6 +142,7 @@ Return only corrected Python code.
                 save_to_file(topic, output_text, "experiments.md")
                 return {"status": "error", "output": output_text, "original_code": code}
         attempt += 1
+
 
 
 

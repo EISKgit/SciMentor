@@ -46,9 +46,8 @@ import os
 def run_full_agent_pipeline(topic):
     # 1️⃣ Generate research plan
     research_plan = generate_research_plan(topic)
-    save_to_file(topic, research_plan, "agent_summary.md")
 
-    # 2️⃣ Run experiment with enforced retries for all outputs
+    # 2️⃣ Run experiment with enforced retries
     experiment_result = None
     retries = 0
     while retries < 3:
@@ -57,22 +56,21 @@ def run_full_agent_pipeline(topic):
         # Check if code, summary, and plot exist
         project_folder = os.path.join("memory", topic.replace(" ", "_"))
         code_path = os.path.join(project_folder, "experiment_code.py")
-        summary_path = os.path.join(project_folder, "agent_summary.md")
         plot_folder = os.path.join(project_folder, "plots")
         plot_exists = os.path.exists(plot_folder) and any(f.endswith(".png") for f in os.listdir(plot_folder))
 
-        if os.path.exists(code_path) and os.path.exists(summary_path) and plot_exists:
-            break  # ✅ all files exist
+        if os.path.exists(code_path) and plot_exists:
+            break  # ✅ all required files exist
         retries += 1
 
-    # 3️⃣ Merge outputs for UI
-    final_output = ""
-    if os.path.exists(summary_path):
-        with open(summary_path, "r", encoding="utf-8") as f:
-            final_output += f.read()
+    # 3️⃣ Merge into one rich summary file
+    final_output = f"# Research Plan\n{research_plan}\n\n"
 
     if experiment_result and "output" in experiment_result:
-        final_output += "\n\n" + experiment_result["output"]
+        final_output += f"# Experiment Output\n{experiment_result['output']}\n"
+
+    # Save the merged file as agent_summary.md
+    save_to_file(topic, final_output, "agent_summary.md")
 
     return {
         "status": "success",
