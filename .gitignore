@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Streamlit cache
+.streamlit/
+
+# Project memory (optional if you don't want user data)
+memory/
+
+# Environment
+.env
